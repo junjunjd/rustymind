@@ -1,0 +1,11 @@
+[package]
+name = "rustymind"
+version = "0.1.0"
+authors = ["Junjun Dong <junjun.dong9@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+serialport = "4"
+
+[dev-dependencies]
+pretty_assertions = "0"
