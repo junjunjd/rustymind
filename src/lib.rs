@@ -347,10 +347,8 @@ mod tests {
         ];
         let mut result: Vec<PacketType> = Vec::new();
         let mut parser = Parser::new();
-        println!("len of test_vec = {}", test_vec.len());
         for data in test_vec {
             if let Some(x) = parser.parse(data) {
-                println!("x is .............. = {:?}", x);
                 result = x;
             }
         }
