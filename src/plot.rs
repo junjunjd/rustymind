@@ -64,7 +64,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     // from pitson
     let sys = System::new();
     let mut data = vec![VecDeque::new(), VecDeque::new()];
-    let mut epoch = 1;
 
     let mut rng = rand::thread_rng();
 
@@ -122,13 +121,10 @@ fn main() -> Result<(), Box<dyn Error>> {
                 }
             }
 
-            println!("data ---------- {:#?}", data);
-            // if epoch == 10 {
-            //     data[0].pop_front();
-            //     data[1].pop_front();
-            //     println!("data ---------- {:#?}", data);
-            //     epoch = 1;
-            // }
+            if data[0].len() == 100 {
+                data[0].pop_front();
+                data[1].pop_front();
+            }
             let root = BitMapBackend::<BGRXPixel>::with_buffer_and_format(
                 buf.borrow_mut(),
                 (W as u32, H as u32),
@@ -158,7 +154,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             drop(root);
             drop(chart);
             window.update_with_buffer(buf.borrow(), W, H)?;
-            epoch += 1;
         }
     }
 
