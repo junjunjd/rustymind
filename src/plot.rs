@@ -10,16 +10,10 @@ use std::borrow::{Borrow, BorrowMut};
 use std::collections::VecDeque;
 use std::error::Error;
 use std::time::SystemTime;
-// from piston example
-use systemstat::platform::common::Platform;
-use systemstat::System;
-const FPS: u32 = 1;
-const LENGTH: u32 = 20;
-const N_DATA_POINTS: usize = (FPS * LENGTH) as usize;
 
 const W: usize = 480;
 const H: usize = 320;
-
+const labels: [&str; 2] = ["Attention", "Meditation"];
 const SAMPLE_RATE: i32 = 10_000;
 const FREAME_RATE: i32 = 30;
 
@@ -62,7 +56,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut parser = Parser::new();
 
     // from pitson
-    let sys = System::new();
     let mut data = vec![VecDeque::new(), VecDeque::new()];
 
     let mut rng = rand::thread_rng();
@@ -145,11 +138,16 @@ fn main() -> Result<(), Box<dyn Error>> {
                         (1..).zip(data.iter()).map(|(a, b)| (a, *b)),
                         &Palette99::pick(idx),
                     ))?
-                    .label(format!("CPU {}", idx))
+                    .label(labels[idx])
                     .legend(move |(x, y)| {
                         Rectangle::new([(x - 5, y - 5), (x + 5, y + 5)], &Palette99::pick(idx))
                     });
             }
+            chart
+                .configure_series_labels()
+                .background_style(&WHITE.mix(0.8))
+                .border_style(&BLACK)
+                .draw()?;
 
             drop(root);
             drop(chart);
