@@ -1,5 +1,5 @@
-use mindwave::dongle;
-use mindwave::Parser;
+use rustymind::dongle;
+use rustymind::Parser;
 
 fn main() {
     let mut port = dongle();

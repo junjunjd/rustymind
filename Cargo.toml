@@ -4,8 +4,26 @@ version = "0.1.0"
 authors = ["Junjun Dong <junjun.dong9@gmail.com>"]
 edition = "2018"
 
+[lib]
+name = "rustymind"
+path = "src/lib.rs"
+
+[[bin]]
+name = "rustymind"
+path = "src/main.rs"
+
+[[bin]]
+name = "rustymind-plot"
+path = "src/plot.rs"
+
 [dependencies]
 serialport = "4"
+plotters = "^0.3.0"
+minifb = "^0.19.3"
+plotters-bitmap = "^0.3.0"
+piston_window = "^0.120.0"
+systemstat = "0.1.7"
+rand = "^0.8.3"
 
 [dev-dependencies]
 pretty_assertions = "0"
