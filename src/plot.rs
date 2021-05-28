@@ -54,12 +54,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut port = dongle();
     let mut temp: Vec<u8> = vec![0; 2048];
     let mut parser = Parser::new();
-
-    // from pitson
     let mut data = vec![VecDeque::new(), VecDeque::new()];
-
-    let mut rng = rand::thread_rng();
-
     let mut buf = BufferWrapper(vec![0u32; W * H]);
 
     let mut fx: f64 = 1.0;
@@ -68,34 +63,36 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut yphase: f64 = 0.1;
 
     let mut window = Window::new("mindwave plot", W, H, WindowOptions::default())?;
-    let root =
+    let mut root =
         BitMapBackend::<BGRXPixel>::with_buffer_and_format(buf.borrow_mut(), (W as u32, H as u32))?
             .into_drawing_area();
     root.fill(&BLACK)?;
 
     let mut chart = ChartBuilder::on(&root)
         .margin(10)
+        .caption(
+            "Real-time eSense plot",
+            ("sans-serif", 15).into_font().color(&GREEN),
+        )
         .set_all_label_area_size(30)
-        .build_cartesian_2d(0..110, 0..110)?;
+        .build_cartesian_2d(0..130, 0..130)?;
 
     chart
         .configure_mesh()
         .label_style(("sans-serif", 15).into_font().color(&GREEN))
+        .x_labels(1)
+        .y_desc("eSense")
         .axis_style(&GREEN)
         .draw()?;
 
     let cs = chart.into_chart_state();
     drop(root);
 
-    //let mut data = VecDeque::new();
-    let start_ts = SystemTime::now();
-    let mut last_flushed = 0.0;
-
     while window.is_open() && !window.is_key_down(Key::Escape) {
         loop {
-            let mut bytes_read = port
-                .read(temp.as_mut_slice())
-                .expect("Found no data when reading from dongle!");
+            let mut bytes_read = port.read(temp.as_mut_slice()).expect(
+                "Found no data when reading from dongle! Please make sure headset is connected.",
+            );
             for i in 0..bytes_read {
                 if let Some(x) = parser.parse(temp[i]) {
                     for r in x {
@@ -145,12 +142,15 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
             chart
                 .configure_series_labels()
-                .background_style(&WHITE.mix(0.8))
+                .legend_area_size(10)
+                .position(SeriesLabelPosition::UpperRight)
+                .background_style(&WHITE.mix(0.5))
                 .border_style(&BLACK)
                 .draw()?;
 
             drop(root);
             drop(chart);
+            window.set_title("Mindwave real-time plot");
             window.update_with_buffer(buf.borrow(), W, H)?;
         }
     }
