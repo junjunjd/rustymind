@@ -2,20 +2,26 @@ use minifb::{Key, KeyRepeat, Window, WindowOptions};
 use plotters::prelude::*;
 use plotters_bitmap::bitmap_pixel::BGRXPixel;
 use plotters_bitmap::BitMapBackend;
-use rand::Rng;
 use rustymind::dongle;
 use rustymind::PacketType;
 use rustymind::Parser;
 use std::borrow::{Borrow, BorrowMut};
 use std::collections::VecDeque;
 use std::error::Error;
-use std::time::SystemTime;
 
-const W: usize = 480;
-const H: usize = 320;
-const labels: [&str; 2] = ["Attention", "Meditation"];
-const SAMPLE_RATE: i32 = 10_000;
-const FREAME_RATE: i32 = 30;
+const W: usize = 800;
+const H: usize = 1000;
+const LABEL: [&str; 2] = ["Attention", "Meditation"];
+const EGGLABEL: [&str; 8] = [
+    "delta",
+    "theta",
+    "low-alpha",
+    "high-alpha",
+    "low-beta",
+    "high-beta",
+    "low-gamma",
+    "mid-gamma",
+];
 
 struct BufferWrapper(Vec<u32>);
 impl Borrow<[u8]> for BufferWrapper {
@@ -43,50 +49,64 @@ impl BorrowMut<[u32]> for BufferWrapper {
     }
 }
 
-fn get_window_title(fx: f64, fy: f64, iphase: f64) -> String {
-    format!(
-        "x={:.1}Hz, y={:.1}Hz, phase={:.1} +/-=Adjust y 9/0=Adjust x <Esc>=Exit",
-        fx, fy, iphase
-    )
-}
-
 fn main() -> Result<(), Box<dyn Error>> {
     let mut port = dongle();
     let mut temp: Vec<u8> = vec![0; 2048];
     let mut parser = Parser::new();
-    let mut data = vec![VecDeque::new(), VecDeque::new()];
+    let mut data = vec![VecDeque::new(); 2];
+    let mut egg = vec![VecDeque::new(); 8];
     let mut buf = BufferWrapper(vec![0u32; W * H]);
-
-    let mut fx: f64 = 1.0;
-    let mut fy: f64 = 1.1;
-    let mut xphase: f64 = 0.0;
-    let mut yphase: f64 = 0.1;
 
     let mut window = Window::new("mindwave plot", W, H, WindowOptions::default())?;
     let mut root =
         BitMapBackend::<BGRXPixel>::with_buffer_and_format(buf.borrow_mut(), (W as u32, H as u32))?
             .into_drawing_area();
     root.fill(&BLACK)?;
+    let (mut upper, mut lower) = root.split_vertically(400);
 
-    let mut chart = ChartBuilder::on(&root)
+    let mut chart_up = ChartBuilder::on(&upper)
         .margin(10)
         .caption(
             "Real-time eSense plot",
             ("sans-serif", 15).into_font().color(&GREEN),
         )
-        .set_all_label_area_size(30)
-        .build_cartesian_2d(0..130, 0..130)?;
+        .set_all_label_area_size(40)
+        .build_cartesian_2d(0..110, 0..110)?;
 
-    chart
+    chart_up
         .configure_mesh()
+        .disable_mesh()
         .label_style(("sans-serif", 15).into_font().color(&GREEN))
         .x_labels(1)
+        .y_labels(10)
         .y_desc("eSense")
         .axis_style(&GREEN)
         .draw()?;
 
-    let cs = chart.into_chart_state();
+    let mut chart_low = ChartBuilder::on(&lower)
+        .margin(10)
+        .caption(
+            "Real-time brainwaves plot",
+            ("sans-serif", 15).into_font().color(&GREEN),
+        )
+        .set_all_label_area_size(40)
+        .build_cartesian_2d(0..110, 0.0..170.0)?;
+
+    chart_low
+        .configure_mesh()
+        .disable_mesh()
+        .label_style(("sans-serif", 15).into_font().color(&GREEN))
+        .x_labels(1)
+        .y_labels(8)
+        .y_desc("EGG power")
+        .axis_style(&GREEN)
+        .draw()?;
+
+    let cs_up = chart_up.into_chart_state();
+    let cs_low = chart_low.into_chart_state();
     drop(root);
+    drop(upper);
+    drop(lower);
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
         loop {
@@ -99,11 +119,14 @@ fn main() -> Result<(), Box<dyn Error>> {
                         match r {
                             PacketType::Attention(value) => {
                                 data[0].push_back(value as i32);
-                                println!("got attention = {:#?}", value);
                             }
                             PacketType::Meditation(value) => {
                                 data[1].push_back(value as i32);
-                                println!("got meditation = {:#?}", value);
+                            }
+                            PacketType::AsicEgg(value) => {
+                                for n in 0..8 {
+                                    egg[n].push_back((value[n] as f64) / (10_000 as f64));
+                                }
                             }
                             _ => (),
                         }
@@ -115,32 +138,47 @@ fn main() -> Result<(), Box<dyn Error>> {
                 data[0].pop_front();
                 data[1].pop_front();
             }
+            if egg[0].len() == 100 {
+                for n in 0..8 {
+                    egg[n].pop_front();
+                }
+            }
             let root = BitMapBackend::<BGRXPixel>::with_buffer_and_format(
                 buf.borrow_mut(),
                 (W as u32, H as u32),
             )?
             .into_drawing_area();
-            let mut chart = cs.clone().restore(&root);
-            chart.plotting_area().fill(&BLACK)?;
+            let (mut upper, mut lower) = root.split_vertically(400);
+            let mut chart_up = cs_up.clone().restore(&upper);
+            chart_up.plotting_area().fill(&BLACK)?;
 
-            chart
+            chart_up
+                .configure_mesh()
+                .bold_line_style(&GREEN.mix(0.2))
+                .light_line_style(&TRANSPARENT)
+                .draw()?;
+
+            let mut chart_low = cs_low.clone().restore(&lower);
+            chart_low.plotting_area().fill(&BLACK)?;
+
+            chart_low
                 .configure_mesh()
                 .bold_line_style(&GREEN.mix(0.2))
                 .light_line_style(&TRANSPARENT)
                 .draw()?;
 
             for (idx, data) in (0..).zip(data.iter()) {
-                chart
+                chart_up
                     .draw_series(LineSeries::new(
                         (1..).zip(data.iter()).map(|(a, b)| (a, *b)),
                         &Palette99::pick(idx),
                     ))?
-                    .label(labels[idx])
+                    .label(LABEL[idx])
                     .legend(move |(x, y)| {
                         Rectangle::new([(x - 5, y - 5), (x + 5, y + 5)], &Palette99::pick(idx))
                     });
             }
-            chart
+            chart_up
                 .configure_series_labels()
                 .legend_area_size(10)
                 .position(SeriesLabelPosition::UpperRight)
@@ -148,8 +186,30 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .border_style(&BLACK)
                 .draw()?;
 
+            for (idx, egg) in (0..).zip(egg.iter()) {
+                chart_low
+                    .draw_series(LineSeries::new(
+                        (1..).zip(egg.iter()).map(|(a, b)| (a, *b)),
+                        &Palette99::pick(idx),
+                    ))?
+                    .label(EGGLABEL[idx])
+                    .legend(move |(x, y)| {
+                        Rectangle::new([(x - 5, y - 5), (x + 5, y + 5)], &Palette99::pick(idx))
+                    });
+            }
+            chart_low
+                .configure_series_labels()
+                .legend_area_size(5)
+                .position(SeriesLabelPosition::UpperRight)
+                .background_style(&WHITE.mix(0.5))
+                .border_style(&BLACK)
+                .draw()?;
+
             drop(root);
-            drop(chart);
+            drop(chart_up);
+            drop(chart_low);
+            drop(upper);
+            drop(lower);
             window.set_title("Mindwave real-time plot");
             window.update_with_buffer(buf.borrow(), W, H)?;
         }
