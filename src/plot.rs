@@ -1,4 +1,4 @@
-use minifb::{Key, KeyRepeat, Window, WindowOptions};
+use minifb::{Key, Window, WindowOptions};
 use plotters::prelude::*;
 use plotters_bitmap::bitmap_pixel::BGRXPixel;
 use plotters_bitmap::BitMapBackend;
@@ -58,11 +58,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut buf = BufferWrapper(vec![0u32; W * H]);
 
     let mut window = Window::new("mindwave plot", W, H, WindowOptions::default())?;
-    let mut root =
+    let root =
         BitMapBackend::<BGRXPixel>::with_buffer_and_format(buf.borrow_mut(), (W as u32, H as u32))?
             .into_drawing_area();
     root.fill(&BLACK)?;
-    let (mut upper, mut lower) = root.split_vertically(400);
+    let (upper, lower) = root.split_vertically(400);
 
     let mut chart_up = ChartBuilder::on(&upper)
         .margin(10)
@@ -110,7 +110,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
         loop {
-            let mut bytes_read = port.read(temp.as_mut_slice()).expect(
+            let bytes_read = port.read(temp.as_mut_slice()).expect(
                 "Found no data when reading from dongle! Please make sure headset is connected.",
             );
             for i in 0..bytes_read {
@@ -148,7 +148,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 (W as u32, H as u32),
             )?
             .into_drawing_area();
-            let (mut upper, mut lower) = root.split_vertically(400);
+            let (upper, lower) = root.split_vertically(400);
             let mut chart_up = cs_up.clone().restore(&upper);
             chart_up.plotting_area().fill(&BLACK)?;
 
