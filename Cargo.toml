@@ -22,8 +22,8 @@ plotters = "^0.3.0"
 minifb = "^0.19.3"
 plotters-bitmap = "^0.3.0"
 piston_window = "^0.120.0"
-systemstat = "0.1.7"
 rand = "^0.8.3"
+log = "^0.4.14"
 
 [dev-dependencies]
 pretty_assertions = "0"

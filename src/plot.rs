@@ -90,7 +90,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             ("sans-serif", 15).into_font().color(&GREEN),
         )
         .set_all_label_area_size(40)
-        .build_cartesian_2d(0..110, 0.0..170.0)?;
+        .build_cartesian_2d(0..110, 0.0..180.0)?;
 
     chart_low
         .configure_mesh()
@@ -110,10 +110,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
         loop {
-            let bytes_read = port.read(temp.as_mut_slice()).expect(
+            let byte_buf = port.read(temp.as_mut_slice()).expect(
                 "Found no data when reading from dongle! Please make sure headset is connected.",
             );
-            for i in 0..bytes_read {
+            for i in 0..byte_buf {
                 if let Some(x) = parser.parse(temp[i]) {
                     for r in x {
                         match r {
@@ -125,7 +125,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                             }
                             PacketType::AsicEgg(value) => {
                                 for n in 0..8 {
-                                    egg[n].push_back((value[n] as f64) / (10_000 as f64));
+                                    egg[n].push_back((value[n] / 10_000) as f64);
                                 }
                             }
                             _ => (),
