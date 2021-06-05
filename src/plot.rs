@@ -8,6 +8,8 @@ use rustymind::Parser;
 use std::borrow::{Borrow, BorrowMut};
 use std::collections::VecDeque;
 use std::error::Error;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 const W: usize = 800;
 const H: usize = 1000;
@@ -50,6 +52,14 @@ impl BorrowMut<[u32]> for BufferWrapper {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
+    let running = Arc::new(AtomicBool::new(true));
+    let r = running.clone();
+    ctrlc::set_handler(move || {
+        r.store(false, Ordering::SeqCst);
+        println!("ctrl-c captured!");
+    })
+    .expect("Error setting Ctrl-C handler");
+
     let mut port = dongle();
     let mut temp: Vec<u8> = vec![0; 2048];
     let mut parser = Parser::new();
@@ -107,113 +117,109 @@ fn main() -> Result<(), Box<dyn Error>> {
     drop(root);
     drop(upper);
     drop(lower);
-
-    while window.is_open() && !window.is_key_down(Key::Escape) {
-        loop {
-            let byte_buf = port.read(temp.as_mut_slice()).expect(
-                "Found no data when reading from dongle! Please make sure headset is connected.",
-            );
-            for i in 0..byte_buf {
-                if let Some(x) = parser.parse(temp[i]) {
-                    for r in x {
-                        match r {
-                            PacketType::Attention(value) => {
-                                data[0].push_back(value as i32);
-                            }
-                            PacketType::Meditation(value) => {
-                                data[1].push_back(value as i32);
-                            }
-                            PacketType::AsicEgg(value) => {
-                                for n in 0..8 {
-                                    egg[n].push_back((value[n] / 10_000) as f64);
-                                }
-                            }
-                            _ => (),
+    while window.is_open() && !window.is_key_down(Key::Escape) && running.load(Ordering::SeqCst) {
+        let byte_buf = port.read(temp.as_mut_slice()).expect(
+            "Found no data when reading from dongle! Please make sure headset is connected.",
+        );
+        for i in 0..byte_buf {
+            if let Some(x) = parser.parse(temp[i]) {
+                for r in x {
+                    match r {
+                        PacketType::Attention(value) => {
+                            data[0].push_back(value as i32);
                         }
+                        PacketType::Meditation(value) => {
+                            data[1].push_back(value as i32);
+                        }
+                        PacketType::AsicEgg(value) => {
+                            for n in 0..8 {
+                                egg[n].push_back((value[n] / 10_000) as f64);
+                            }
+                        }
+                        _ => (),
                     }
                 }
             }
-
-            if data[0].len() == 100 {
-                data[0].pop_front();
-                data[1].pop_front();
-            }
-            if egg[0].len() == 100 {
-                for n in 0..8 {
-                    egg[n].pop_front();
-                }
-            }
-            let root = BitMapBackend::<BGRXPixel>::with_buffer_and_format(
-                buf.borrow_mut(),
-                (W as u32, H as u32),
-            )?
-            .into_drawing_area();
-            let (upper, lower) = root.split_vertically(400);
-            let mut chart_up = cs_up.clone().restore(&upper);
-            chart_up.plotting_area().fill(&BLACK)?;
-
-            chart_up
-                .configure_mesh()
-                .bold_line_style(&GREEN.mix(0.2))
-                .light_line_style(&TRANSPARENT)
-                .draw()?;
-
-            let mut chart_low = cs_low.clone().restore(&lower);
-            chart_low.plotting_area().fill(&BLACK)?;
-
-            chart_low
-                .configure_mesh()
-                .bold_line_style(&GREEN.mix(0.2))
-                .light_line_style(&TRANSPARENT)
-                .draw()?;
-
-            for (idx, data) in (0..).zip(data.iter()) {
-                chart_up
-                    .draw_series(LineSeries::new(
-                        (1..).zip(data.iter()).map(|(a, b)| (a, *b)),
-                        &Palette99::pick(idx),
-                    ))?
-                    .label(LABEL[idx])
-                    .legend(move |(x, y)| {
-                        Rectangle::new([(x - 5, y - 5), (x + 5, y + 5)], &Palette99::pick(idx))
-                    });
-            }
-            chart_up
-                .configure_series_labels()
-                .legend_area_size(10)
-                .position(SeriesLabelPosition::UpperRight)
-                .background_style(&WHITE.mix(0.5))
-                .border_style(&BLACK)
-                .draw()?;
-
-            for (idx, egg) in (0..).zip(egg.iter()) {
-                chart_low
-                    .draw_series(LineSeries::new(
-                        (1..).zip(egg.iter()).map(|(a, b)| (a, *b)),
-                        &Palette99::pick(idx),
-                    ))?
-                    .label(EGGLABEL[idx])
-                    .legend(move |(x, y)| {
-                        Rectangle::new([(x - 5, y - 5), (x + 5, y + 5)], &Palette99::pick(idx))
-                    });
-            }
-            chart_low
-                .configure_series_labels()
-                .legend_area_size(5)
-                .position(SeriesLabelPosition::UpperRight)
-                .background_style(&WHITE.mix(0.5))
-                .border_style(&BLACK)
-                .draw()?;
-
-            drop(root);
-            drop(chart_up);
-            drop(chart_low);
-            drop(upper);
-            drop(lower);
-            window.set_title("Mindwave real-time plot");
-            window.update_with_buffer(buf.borrow(), W, H)?;
         }
-    }
 
+        if data[0].len() == 100 {
+            data[0].pop_front();
+            data[1].pop_front();
+        }
+        if egg[0].len() == 100 {
+            for n in 0..8 {
+                egg[n].pop_front();
+            }
+        }
+        let root = BitMapBackend::<BGRXPixel>::with_buffer_and_format(
+            buf.borrow_mut(),
+            (W as u32, H as u32),
+        )?
+        .into_drawing_area();
+        let (upper, lower) = root.split_vertically(400);
+        let mut chart_up = cs_up.clone().restore(&upper);
+        chart_up.plotting_area().fill(&BLACK)?;
+
+        chart_up
+            .configure_mesh()
+            .bold_line_style(&GREEN.mix(0.2))
+            .light_line_style(&TRANSPARENT)
+            .draw()?;
+
+        let mut chart_low = cs_low.clone().restore(&lower);
+        chart_low.plotting_area().fill(&BLACK)?;
+
+        chart_low
+            .configure_mesh()
+            .bold_line_style(&GREEN.mix(0.2))
+            .light_line_style(&TRANSPARENT)
+            .draw()?;
+
+        for (idx, data) in (0..).zip(data.iter()) {
+            chart_up
+                .draw_series(LineSeries::new(
+                    (1..).zip(data.iter()).map(|(a, b)| (a, *b)),
+                    &Palette99::pick(idx),
+                ))?
+                .label(LABEL[idx])
+                .legend(move |(x, y)| {
+                    Rectangle::new([(x - 5, y - 5), (x + 5, y + 5)], &Palette99::pick(idx))
+                });
+        }
+        chart_up
+            .configure_series_labels()
+            .legend_area_size(10)
+            .position(SeriesLabelPosition::UpperRight)
+            .background_style(&WHITE.mix(0.5))
+            .border_style(&BLACK)
+            .draw()?;
+
+        for (idx, egg) in (0..).zip(egg.iter()) {
+            chart_low
+                .draw_series(LineSeries::new(
+                    (1..).zip(egg.iter()).map(|(a, b)| (a, *b)),
+                    &Palette99::pick(idx),
+                ))?
+                .label(EGGLABEL[idx])
+                .legend(move |(x, y)| {
+                    Rectangle::new([(x - 5, y - 5), (x + 5, y + 5)], &Palette99::pick(idx))
+                });
+        }
+        chart_low
+            .configure_series_labels()
+            .legend_area_size(5)
+            .position(SeriesLabelPosition::UpperRight)
+            .background_style(&WHITE.mix(0.5))
+            .border_style(&BLACK)
+            .draw()?;
+
+        drop(root);
+        drop(chart_up);
+        drop(chart_low);
+        drop(upper);
+        drop(lower);
+        window.set_title("Mindwave real-time plot");
+        window.update_with_buffer(buf.borrow(), W, H)?;
+    }
     Ok(())
 }
