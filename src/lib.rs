@@ -192,7 +192,7 @@ impl Parser {
                         info!("----- headset is in standby mode awaiting for a command -----");
                         result.push(PacketType::Standby);
                     } else if self.payload[n + 2] == 0x01 {
-                        info!("----- dongle is trying to connect to a headset -----");
+                        info!("----- connect_headset is trying to connect to a headset -----");
                         result.push(PacketType::FindHeadset);
                     } else {
                         warn!("----- undefined packet code while standby -----");
@@ -279,7 +279,7 @@ impl Parser {
     }
 }
 
-pub fn dongle() -> Box<dyn serialport::SerialPort> {
+pub fn connect_headset(headset: &[u8]) -> Box<dyn serialport::SerialPort> {
     let mut port = serialport::new("/dev/tty.usbserial-14140", 115_200)
         .timeout(core::time::Duration::from_millis(1000))
         .open()
@@ -287,16 +287,18 @@ pub fn dongle() -> Box<dyn serialport::SerialPort> {
 
     const DISCONNECT: u8 = 0xc1;
     const CONNECT: u8 = 0xc0;
-    const AUTOCONNECT: u8 = 0xc2;
-    let headset = [0xa2, 0x6c];
     let mut serial_buf: Vec<u8> = vec![0];
 
     port.write(&[DISCONNECT])
         .expect("Failed to write DISCONNECT!");
     port.read(serial_buf.as_mut_slice())
         .expect("Failed to reand any data!");
-    port.write(&[CONNECT]).expect("Failed to write CONNECT!");
-    port.write(&headset).expect("Failed to write headset ID!");
+    if headset.len() != 1 {
+        port.write(&[CONNECT]).expect("Failed to write CONNECT!");
+        port.write(&headset).expect("Failed to write headset ID!");
+    } else {
+        port.write(&headset).expect("Failed to write headset ID!");
+    }
     return port;
 }
 

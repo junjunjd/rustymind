@@ -2,7 +2,7 @@ use minifb::{Key, Window, WindowOptions};
 use plotters::prelude::*;
 use plotters_bitmap::bitmap_pixel::BGRXPixel;
 use plotters_bitmap::BitMapBackend;
-use rustymind::dongle;
+use rustymind::connect_headset;
 use rustymind::PacketType;
 use rustymind::Parser;
 use std::borrow::{Borrow, BorrowMut};
@@ -56,11 +56,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     let r = running.clone();
     ctrlc::set_handler(move || {
         r.store(false, Ordering::SeqCst);
-        println!("ctrl-c captured!");
     })
     .expect("Error setting Ctrl-C handler");
 
-    let mut port = dongle();
+    //let headset = [0xa2, 0x6c];
+    let headset = [0xc2];
+    let mut port = connect_headset(&headset);
     let mut temp: Vec<u8> = vec![0; 2048];
     let mut parser = Parser::new();
     let mut data = vec![VecDeque::new(); 2];
@@ -100,7 +101,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             ("sans-serif", 15).into_font().color(&GREEN),
         )
         .set_all_label_area_size(40)
-        .build_cartesian_2d(0..110, 0.0..180.0)?;
+        .build_cartesian_2d(0..110, 0.0..300.0)?;
 
     chart_low
         .configure_mesh()
@@ -119,7 +120,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     drop(lower);
     while window.is_open() && !window.is_key_down(Key::Escape) && running.load(Ordering::SeqCst) {
         let byte_buf = port.read(temp.as_mut_slice()).expect(
-            "Found no data when reading from dongle! Please make sure headset is connected.",
+            "Found no data when reading from connect_headset! Please make sure headset is connected.",
         );
         for i in 0..byte_buf {
             if let Some(x) = parser.parse(temp[i]) {
