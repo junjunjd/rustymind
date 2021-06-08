@@ -1,3 +1,4 @@
+use env_logger;
 use minifb::{Key, Window, WindowOptions};
 use plotters::prelude::*;
 use plotters_bitmap::bitmap_pixel::BGRXPixel;
@@ -52,6 +53,7 @@ impl BorrowMut<[u32]> for BufferWrapper {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
+    env_logger::init();
     let running = Arc::new(AtomicBool::new(true));
     let r = running.clone();
     ctrlc::set_handler(move || {
@@ -133,9 +135,14 @@ fn main() -> Result<(), Box<dyn Error>> {
                             data[1].push_back(value as i32);
                         }
                         PacketType::AsicEgg(value) => {
-                            for n in 0..8 {
-                                egg[n].push_back((value[n] / 10_000) as f64);
-                            }
+                            egg[0].push_back((value.delta / 10_000) as f64);
+                            egg[1].push_back((value.theta / 10_000) as f64);
+                            egg[2].push_back((value.low_alpha / 10_000) as f64);
+                            egg[3].push_back((value.high_alpha / 10_000) as f64);
+                            egg[4].push_back((value.low_beta / 10_000) as f64);
+                            egg[5].push_back((value.high_beta / 10_000) as f64);
+                            egg[6].push_back((value.low_gamma / 10_000) as f64);
+                            egg[7].push_back((value.mid_gamma / 10_000) as f64);
                         }
                         _ => (),
                     }

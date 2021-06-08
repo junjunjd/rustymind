@@ -1,3 +1,4 @@
+use env_logger;
 use rustymind::connect_headset;
 use rustymind::Parser;
 

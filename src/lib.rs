@@ -1,4 +1,4 @@
-use log::{error, info, warn};
+use log::{debug, error, info, warn};
 
 #[derive(PartialEq, Eq, Debug)]
 pub enum PacketType {
@@ -19,7 +19,7 @@ pub enum PacketType {
     Meditation(u8),
     Blink(u8),
     RawValue(i16),
-    AsicEgg(Vec<u32>),
+    AsicEgg(AsicEgg),
     PacketUndefined(u8),
 }
 
@@ -28,6 +28,18 @@ pub enum State {
     FirstSync,
     SecondSync,
     ValidPacket,
+}
+
+#[derive(PartialEq, Eq, Debug)]
+pub struct AsicEgg {
+    pub delta: u32,
+    pub theta: u32,
+    pub low_alpha: u32,
+    pub high_alpha: u32,
+    pub low_beta: u32,
+    pub high_beta: u32,
+    pub low_gamma: u32,
+    pub mid_gamma: u32,
 }
 
 pub struct Parser {
@@ -74,14 +86,14 @@ impl Parser {
     fn handle_nosync(&mut self, data: u8) {
         if data == 0xaa {
             self.state = State::FirstSync;
-            info!("-------- Standby for a valid packet --------");
+            debug!("Standby for a valid packet");
         }
     }
 
     fn handle_firstsync(&mut self, data: u8) {
         if data == 0xaa {
             self.state = State::SecondSync;
-            info!("-------- Packet synced --------");
+            debug!("Packet synced");
         } else {
             self.state = State::NoSync;
         }
@@ -90,14 +102,11 @@ impl Parser {
     fn handle_secondsync(&mut self, data: u8) {
         if data > 0xaa {
             self.state = State::NoSync;
-            error!("********** ERROR : Plength larger than 170! **********");
+            error!("Plength larger than 170!");
         } else if data < 0xaa {
             self.state = State::ValidPacket;
             self.plength = data;
-            info!(
-                "-------- Valid packet available, len({}) --------",
-                self.plength
-            );
+            debug!("Valid packet available, len({})", self.plength);
         }
     }
 
@@ -105,10 +114,10 @@ impl Parser {
         if self.plength == 0 {
             self.checksum = !self.checksum;
             let re = if data != self.checksum {
-                info!("********** Checksum failed **********");
+                debug!("Checksum failed");
                 None
             } else {
-                info!("---------- checksum matched, start parsing ----------");
+                debug!("Checksum matched, start parsing");
                 Some(self.handle_parser())
             };
             self.reset();
@@ -129,7 +138,7 @@ impl Parser {
                 // Headset Connected
                 if self.payload[n + 1] == 0x02 {
                     info!(
-                        "----- headset connected, ID {:#04x} {:#04x} -----",
+                        "headset connected, ID {:#04x} {:#04x}",
                         self.payload[n + 2],
                         self.payload[n + 3]
                     );
@@ -145,8 +154,8 @@ impl Parser {
             } else if self.payload[n] == 0xd1 {
                 // Headset Not Found
                 if self.payload[n + 1] == 0x02 {
-                    info!(
-                        "----- Headset ID {:#04x} {:#04x} could not be found -----",
+                    warn!(
+                        "Headset {:#04x} {:#04x} not found",
                         self.payload[n + 2],
                         self.payload[n + 3]
                     );
@@ -165,7 +174,7 @@ impl Parser {
             } else if self.payload[n] == 0xd2 {
                 if self.payload[n + 1] == 0x02 {
                     info!(
-                        "----- disconnected from headset with ID {:#04x} {:#04x} -----",
+                        "disconnected from headset {:#04x} {:#04x}",
                         self.payload[n + 2],
                         self.payload[n + 3]
                     );
@@ -179,7 +188,7 @@ impl Parser {
                 n += 4;
             } else if self.payload[n] == 0xd3 {
                 if self.payload[n + 1] == 0x00 {
-                    info!("----- the last command request was denied -----");
+                    warn!("the last command request was denied");
                     result.push(PacketType::RequestDenied);
                 } else {
                     warn!("undefined packetLength while headset disconnected");
@@ -189,50 +198,42 @@ impl Parser {
             } else if self.payload[n] == 0xd4 {
                 if self.payload[n + 1] == 0x01 {
                     if self.payload[n + 2] == 0x00 {
-                        info!("----- headset is in standby mode awaiting for a command -----");
+                        debug!("headset is in standby mode awaiting for a command");
                         result.push(PacketType::Standby);
                     } else if self.payload[n + 2] == 0x01 {
-                        info!("----- connect_headset is trying to connect to a headset -----");
+                        debug!("connecting to a headset");
                         result.push(PacketType::FindHeadset);
                     } else {
-                        warn!("----- undefined packet code while standby -----");
+                        warn!("undefined packet code while standby");
                         result.push(PacketType::StandbyPacketUndefined);
                     }
                 } else {
-                    warn!("----- undefined packet length while standby -----");
+                    warn!("undefined packet length while standby");
                     result.push(PacketType::StandbyLengthUndefined);
                 }
                 n += 3;
             } else if self.payload[n] == 0x02 {
                 // poor signal
-                info!(
-                    "========== Poor signal, quality {:#04x} ==========",
-                    self.payload[n + 1]
-                );
+                if self.payload[n + 1] == 200 {
+                    warn!("the ThinkGear contacts are not touching the user's skin");
+                } else {
+                    debug!("Poor signal quality {:#04x}", self.payload[n + 1]);
+                }
                 result.push(PacketType::PoorSignal(self.payload[n + 1]));
                 n += 2;
             } else if self.payload[n] == 0x04 {
                 // attention
-                info!(
-                    "========== Attention, esense {:#04x} ==========",
-                    self.payload[n + 1]
-                );
+                debug!("Attention esense {:#04x}", self.payload[n + 1]);
                 result.push(PacketType::Attention(self.payload[n + 1]));
                 n += 2;
             } else if self.payload[n] == 0x05 {
                 // meditation
-                info!(
-                    "========== Meditation, esense {:#04x} ==========",
-                    self.payload[n + 1]
-                );
+                debug!("Meditation esense {:#04x}", self.payload[n + 1]);
                 result.push(PacketType::Meditation(self.payload[n + 1]));
                 n += 2;
             } else if self.payload[n] == 0x16 {
                 // blink
-                info!(
-                    "========== Blink, strength {:#04x} ==========",
-                    self.payload[n + 1]
-                );
+                debug!("Blink strength {:#04x}", self.payload[n + 1]);
                 result.push(PacketType::Blink(self.payload[n + 1]));
                 n += 2;
             } else if self.payload[n] == 0x80 {
@@ -240,7 +241,7 @@ impl Parser {
                 // (high-order byte followed by low-order byte) (-32768 to 32767)
                 let raw_val: i16 =
                     ((self.payload[n + 2] as i16) << 8) | (self.payload[n + 3] as i16);
-                info!("========== Raw value {:#04x} ==========", raw_val);
+                debug!("Raw value {:#04x}", raw_val);
                 result.push(PacketType::RawValue(raw_val));
                 n += 4;
             } else if self.payload[n] == 0x83 {
@@ -255,26 +256,27 @@ impl Parser {
                         | (self.payload[n + 4 + i * 3] as u32);
                     current_vec.push(asic);
                 }
-                info!("========== Delta {:#04x} ==========", current_vec[0]);
-                info!("========== Theta {:#04x} ==========", current_vec[1]);
-                info!("========== LowAlpha {:#04x} ==========", current_vec[2]);
-                info!("========== HighAlpha {:#04x} ==========", current_vec[3]);
-                info!("========== LowBeta {:#04x} ==========", current_vec[4]);
-                info!("========== highBeta {:#04x} ==========", current_vec[5]);
-                info!("========== LowGamma {:#04x} ==========", current_vec[6]);
-                info!("========== midGamma {:#04x} ==========", current_vec[7]);
-                result.push(PacketType::AsicEgg(current_vec));
+
+                let egg_power = AsicEgg {
+                    delta: current_vec[0],
+                    theta: current_vec[1],
+                    low_alpha: current_vec[2],
+                    high_alpha: current_vec[3],
+                    low_beta: current_vec[4],
+                    high_beta: current_vec[5],
+                    low_gamma: current_vec[6],
+                    mid_gamma: current_vec[7],
+                };
+                debug!("Delta {:#04x}, Theta {:#04x}, LowAlpha {:#04x}, HighAlpha {:#04x}, LowBeta {:#04x}, highBeta {:#04x}, LowGamma {:#04x}, MidGamma {:#04x}", egg_power.delta, egg_power.theta, egg_power.low_alpha, egg_power.high_alpha, egg_power.low_beta, egg_power.high_beta, egg_power.low_gamma, egg_power.mid_gamma);
+                result.push(PacketType::AsicEgg(egg_power));
                 n += 26;
             } else {
-                warn!(
-                    "********** packet code undefined, {:#04x} **********",
-                    self.payload[n]
-                );
+                warn!("packet code undefined {:#04x}", self.payload[n]);
                 result.push(PacketType::PacketUndefined(self.payload[n]));
                 n += 1;
             }
         }
-        info!("-------- end of packet --------");
+        debug!("end of packet");
         result
     }
 }
@@ -292,7 +294,7 @@ pub fn connect_headset(headset: &[u8]) -> Box<dyn serialport::SerialPort> {
     port.write(&[DISCONNECT])
         .expect("Failed to write DISCONNECT!");
     port.read(serial_buf.as_mut_slice())
-        .expect("Failed to reand any data!");
+        .expect("Failed to read any data!");
     if headset.len() != 1 {
         port.write(&[CONNECT]).expect("Failed to write CONNECT!");
         port.write(&headset).expect("Failed to write headset ID!");
@@ -355,7 +357,17 @@ mod tests {
             }
         }
 
-        let test_asic: Vec<u32> = vec![0x94, 0x42, 0x0b, 0x64, 0x4d, 0x3d, 0x07, 0x05];
+        let test_asic = AsicEgg {
+            delta: 0x94,
+            theta: 0x42,
+            low_alpha: 0x0b,
+            high_alpha: 0x64,
+            low_beta: 0x4d,
+            high_beta: 0x3d,
+            low_gamma: 0x07,
+            mid_gamma: 0x05,
+        };
+
         assert_eq!(
             result,
             vec![
