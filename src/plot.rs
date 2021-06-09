@@ -63,7 +63,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     //let headset = [0xa2, 0x6c];
     let headset = [0xc2];
-    let mut port = connect_headset(&headset);
+    let path = "/dev/tty.usbserial-14140";
+    let mut port = connect_headset(path, &headset)?;
     let mut temp: Vec<u8> = vec![0; 2048];
     let mut parser = Parser::new();
     let mut data = vec![VecDeque::new(); 2];

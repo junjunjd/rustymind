@@ -281,27 +281,30 @@ impl Parser {
     }
 }
 
-pub fn connect_headset(headset: &[u8]) -> Box<dyn serialport::SerialPort> {
-    let mut port = serialport::new("/dev/tty.usbserial-14140", 115_200)
+pub fn connect_headset(
+    path: &str,
+    headset: &[u8],
+) -> Result<Box<dyn serialport::SerialPort>, &'static str> {
+    let mut port = serialport::new(path, 115_200)
         .timeout(core::time::Duration::from_millis(1000))
         .open()
-        .expect("Failed to open port");
+        .map_err(|_| "Cannot connect to dongle. Please make sure the serial number of your dongle is correct.")?;
 
     const DISCONNECT: u8 = 0xc1;
     const CONNECT: u8 = 0xc0;
     let mut serial_buf: Vec<u8> = vec![0];
 
     port.write(&[DISCONNECT])
-        .expect("Failed to write DISCONNECT!");
+        .map_err(|_| "Failed to write DISCONNECT to dongle.")?;
     port.read(serial_buf.as_mut_slice())
-        .expect("Failed to read any data!");
+        .map_err(|_| "Cannot read data from dongle.")?;
     if headset.len() != 1 {
-        port.write(&[CONNECT]).expect("Failed to write CONNECT!");
-        port.write(&headset).expect("Failed to write headset ID!");
-    } else {
-        port.write(&headset).expect("Failed to write headset ID!");
+        port.write(&[CONNECT])
+            .map_err(|_| "Failed to write CONNECT to dongle.")?;
     }
-    return port;
+    port.write(&headset)
+        .map_err(|_| "Failed to write headset ID to dongle.")?;
+    return Ok(port);
 }
 
 #[cfg(test)]
