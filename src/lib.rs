@@ -1,5 +1,7 @@
 use log::{debug, error, info, warn};
 
+pub const HEADSETID_AUTOCONNECT: [u8; 1] = [0xc2];
+
 #[derive(PartialEq, Eq, Debug)]
 pub enum PacketType {
     HeadsetConnected(u16),

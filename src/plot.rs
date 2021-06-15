@@ -1,11 +1,11 @@
+use clap::{App, Arg};
 use env_logger;
+use hex::decode;
 use minifb::{Key, Window, WindowOptions};
 use plotters::prelude::*;
 use plotters_bitmap::bitmap_pixel::BGRXPixel;
 use plotters_bitmap::BitMapBackend;
-use rustymind::connect_headset;
-use rustymind::PacketType;
-use rustymind::Parser;
+use rustymind::{connect_headset, PacketType, Parser, HEADSETID_AUTOCONNECT};
 use std::borrow::{Borrow, BorrowMut};
 use std::collections::VecDeque;
 use std::error::Error;
@@ -53,6 +53,29 @@ impl BorrowMut<[u32]> for BufferWrapper {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
+    let matches = App::new("rustymind")
+        .version("1.0")
+        .author("Junjun Dong <junjun.dong9@gmail.com>")
+        .about("parse mindwaves and draw real time plots")
+        .arg(
+            Arg::with_name("dongle-path")
+                .help("Sets the dongle path")
+                .required(true),
+        )
+        .arg(Arg::with_name("HEADSET_ID").help(
+            "Sets the headset ID. Set headset ID to 0xc2 to switch into auto-connect mode and connect to any to any headsets dongle can find",
+        ))
+        .get_matches();
+
+    println!(
+        "Using dongle path: {}",
+        matches.value_of("dongle-path").unwrap()
+    );
+    println!(
+        "Using headset ID: {}",
+        matches.value_of("HEADSET_ID").unwrap()
+    );
+
     env_logger::init();
     let running = Arc::new(AtomicBool::new(true));
     let r = running.clone();
@@ -61,10 +84,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     })
     .expect("Error setting Ctrl-C handler");
 
-    //let headset = [0xa2, 0x6c];
-    let headset = [0xc2];
-    let path = "/dev/tty.usbserial-14140";
-    let mut port = connect_headset(path, &headset)?;
+    let headset = matches
+        .value_of("HEADSET_ID")
+        .map_or(HEADSETID_AUTOCONNECT.to_vec(), |v| {
+            decode(v).expect("Hex decoding failed")
+        });
+    let path = matches.value_of("dongle-path").unwrap();
+    let mut port = connect_headset(path, &headset[..])?;
     let mut temp: Vec<u8> = vec![0; 2048];
     let mut parser = Parser::new();
     let mut data = vec![VecDeque::new(); 2];
