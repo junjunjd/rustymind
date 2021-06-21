@@ -53,6 +53,7 @@ impl BorrowMut<[u32]> for BufferWrapper {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
+    env_logger::init();
     let matches = App::new("rustymind")
         .version("1.0")
         .author("Junjun Dong <junjun.dong9@gmail.com>")
@@ -66,24 +67,12 @@ fn main() -> Result<(), Box<dyn Error>> {
             "Sets the headset ID. Set headset ID to 0xc2 to switch into auto-connect mode and connect to any to any headsets dongle can find",
         ))
         .get_matches();
-
-    println!(
-        "Using dongle path: {}",
-        matches.value_of("dongle-path").unwrap()
-    );
-    println!(
-        "Using headset ID: {}",
-        matches.value_of("HEADSET_ID").unwrap()
-    );
-
-    env_logger::init();
     let running = Arc::new(AtomicBool::new(true));
     let r = running.clone();
     ctrlc::set_handler(move || {
         r.store(false, Ordering::SeqCst);
     })
     .expect("Error setting Ctrl-C handler");
-
     let headset = matches
         .value_of("HEADSET_ID")
         .map_or(HEADSETID_AUTOCONNECT.to_vec(), |v| {
@@ -93,17 +82,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut port = connect_headset(path, &headset[..])?;
     let mut temp: Vec<u8> = vec![0; 2048];
     let mut parser = Parser::new();
-    let mut data = vec![VecDeque::new(); 2];
+    let mut esense = vec![VecDeque::new(); 2];
     let mut egg = vec![VecDeque::new(); 8];
     let mut buf = BufferWrapper(vec![0u32; W * H]);
-
     let mut window = Window::new("mindwave plot", W, H, WindowOptions::default())?;
     let root =
         BitMapBackend::<BGRXPixel>::with_buffer_and_format(buf.borrow_mut(), (W as u32, H as u32))?
             .into_drawing_area();
     root.fill(&BLACK)?;
     let (upper, lower) = root.split_vertically(400);
-
     let mut chart_up = ChartBuilder::on(&upper)
         .margin(10)
         .caption(
@@ -112,7 +99,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         )
         .set_all_label_area_size(40)
         .build_cartesian_2d(0..110, 0..110)?;
-
+    let mut chart_low = ChartBuilder::on(&lower)
+        .margin(10)
+        .caption(
+            "Real-time brainwaves plot",
+            ("sans-serif", 15).into_font().color(&GREEN),
+        )
+        .set_all_label_area_size(40)
+        .build_cartesian_2d(0..110, 0.0..300.0)?;
     chart_up
         .configure_mesh()
         .disable_mesh()
@@ -122,16 +116,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         .y_desc("eSense")
         .axis_style(&GREEN)
         .draw()?;
-
-    let mut chart_low = ChartBuilder::on(&lower)
-        .margin(10)
-        .caption(
-            "Real-time brainwaves plot",
-            ("sans-serif", 15).into_font().color(&GREEN),
-        )
-        .set_all_label_area_size(40)
-        .build_cartesian_2d(0..110, 0.0..300.0)?;
-
     chart_low
         .configure_mesh()
         .disable_mesh()
@@ -141,25 +125,45 @@ fn main() -> Result<(), Box<dyn Error>> {
         .y_desc("EGG power")
         .axis_style(&GREEN)
         .draw()?;
-
     let cs_up = chart_up.into_chart_state();
     let cs_low = chart_low.into_chart_state();
     drop(root);
     drop(upper);
     drop(lower);
+
     while window.is_open() && !window.is_key_down(Key::Escape) && running.load(Ordering::SeqCst) {
         let byte_buf = port.read(temp.as_mut_slice()).expect(
-            "Found no data when reading from connect_headset! Please make sure headset is connected.",
+            "Found no data when reading from dongle. Please make sure headset is connected.",
         );
+        let root = BitMapBackend::<BGRXPixel>::with_buffer_and_format(
+            buf.borrow_mut(),
+            (W as u32, H as u32),
+        )?
+        .into_drawing_area();
+        let (upper, lower) = root.split_vertically(400);
+        let mut chart_up = cs_up.clone().restore(&upper);
+        let mut chart_low = cs_low.clone().restore(&lower);
+        chart_up.plotting_area().fill(&BLACK)?;
+        chart_up
+            .configure_mesh()
+            .bold_line_style(&GREEN.mix(0.2))
+            .light_line_style(&TRANSPARENT)
+            .draw()?;
+        chart_low.plotting_area().fill(&BLACK)?;
+        chart_low
+            .configure_mesh()
+            .bold_line_style(&GREEN.mix(0.2))
+            .light_line_style(&TRANSPARENT)
+            .draw()?;
         for i in 0..byte_buf {
             if let Some(x) = parser.parse(temp[i]) {
                 for r in x {
                     match r {
                         PacketType::Attention(value) => {
-                            data[0].push_back(value as i32);
+                            esense[0].push_back(value as i32);
                         }
                         PacketType::Meditation(value) => {
-                            data[1].push_back(value as i32);
+                            esense[1].push_back(value as i32);
                         }
                         PacketType::AsicEgg(value) => {
                             egg[0].push_back((value.delta / 10_000) as f64);
@@ -176,44 +180,19 @@ fn main() -> Result<(), Box<dyn Error>> {
                 }
             }
         }
-
-        if data[0].len() == 100 {
-            data[0].pop_front();
-            data[1].pop_front();
+        if esense[0].len() == 100 {
+            esense[0].pop_front();
+            esense[1].pop_front();
         }
         if egg[0].len() == 100 {
             for n in 0..8 {
                 egg[n].pop_front();
             }
         }
-        let root = BitMapBackend::<BGRXPixel>::with_buffer_and_format(
-            buf.borrow_mut(),
-            (W as u32, H as u32),
-        )?
-        .into_drawing_area();
-        let (upper, lower) = root.split_vertically(400);
-        let mut chart_up = cs_up.clone().restore(&upper);
-        chart_up.plotting_area().fill(&BLACK)?;
-
-        chart_up
-            .configure_mesh()
-            .bold_line_style(&GREEN.mix(0.2))
-            .light_line_style(&TRANSPARENT)
-            .draw()?;
-
-        let mut chart_low = cs_low.clone().restore(&lower);
-        chart_low.plotting_area().fill(&BLACK)?;
-
-        chart_low
-            .configure_mesh()
-            .bold_line_style(&GREEN.mix(0.2))
-            .light_line_style(&TRANSPARENT)
-            .draw()?;
-
-        for (idx, data) in (0..).zip(data.iter()) {
+        for (idx, esense) in (0..).zip(esense.iter()) {
             chart_up
                 .draw_series(LineSeries::new(
-                    (1..).zip(data.iter()).map(|(a, b)| (a, *b)),
+                    (1..).zip(esense.iter()).map(|(a, b)| (a, *b)),
                     &Palette99::pick(idx),
                 ))?
                 .label(LABEL[idx])
@@ -228,7 +207,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             .background_style(&WHITE.mix(0.5))
             .border_style(&BLACK)
             .draw()?;
-
         for (idx, egg) in (0..).zip(egg.iter()) {
             chart_low
                 .draw_series(LineSeries::new(
@@ -247,7 +225,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             .background_style(&WHITE.mix(0.5))
             .border_style(&BLACK)
             .draw()?;
-
         drop(root);
         drop(chart_up);
         drop(chart_low);

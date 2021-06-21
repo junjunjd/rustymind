@@ -1,10 +1,12 @@
 use clap::{App, Arg};
 use env_logger;
 use hex::decode;
-use rustymind::{connect_headset, Parser, HEADSETID_AUTOCONNECT};
+use rustymind::{connect_headset, PacketType, Parser, HEADSETID_AUTOCONNECT};
 use std::error::Error;
 
+#[allow(unreachable_code)]
 fn main() -> Result<(), Box<dyn Error>> {
+    env_logger::init();
     let matches = App::new("rustymind")
         .version("1.0")
         .author("Junjun Dong <junjun.dong9@gmail.com>")
@@ -18,16 +20,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             "Sets the headset ID. Set headset ID to 0xc2 to switch into auto-connect mode and connect to any to any headsets dongle can find",
         ))
         .get_matches();
-
-    println!(
-        "Using dongle path: {}",
-        matches.value_of("dongle-path").unwrap()
-    );
-    println!(
-        "Using headset ID: {}",
-        matches.value_of("HEADSET_ID").unwrap()
-    );
-    env_logger::init();
     let headset = matches
         .value_of("HEADSET_ID")
         .map_or(HEADSETID_AUTOCONNECT.to_vec(), |v| {
@@ -35,15 +27,30 @@ fn main() -> Result<(), Box<dyn Error>> {
         });
     let path = matches.value_of("dongle-path").unwrap();
     let mut port = connect_headset(path, &headset[..])?;
-    let mut temp: Vec<u8> = vec![0];
+    let mut temp: Vec<u8> = vec![0; 2048];
     let mut parser = Parser::new();
-    let mut result_vec = Vec::new();
 
     loop {
-        port.read(temp.as_mut_slice())
-            .expect("Found no data when reading from connect_headset!");
-        if let Some(x) = parser.parse(temp[0]) {
-            result_vec.push(x);
+        let byte_buf = port.read(temp.as_mut_slice()).expect(
+            "Found no data when reading from dongle. Please make sure headset is connected.",
+        );
+        for i in 0..byte_buf {
+            if let Some(x) = parser.parse(temp[i]) {
+                for r in x {
+                    match r {
+                        PacketType::Attention(value) => {
+                            println!("Attention value = {}", value);
+                        }
+                        PacketType::Meditation(value) => {
+                            println!("Meditation value = {}", value);
+                        }
+                        PacketType::AsicEgg(value) => {
+                            println!("EGG power values = {:?}", value);
+                        }
+                        _ => (),
+                    }
+                }
+            }
         }
     }
     Ok(())
