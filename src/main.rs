@@ -27,15 +27,15 @@ fn main() -> Result<(), Box<dyn Error>> {
         });
     let path = matches.value_of("dongle-path").unwrap();
     let mut port = connect_headset(path, &headset[..])?;
-    let mut temp: Vec<u8> = vec![0; 2048];
+    let mut read_buf: Vec<u8> = vec![0; 2048];
     let mut parser = Parser::new();
 
     loop {
-        let byte_buf = port.read(temp.as_mut_slice()).expect(
+        let bytes_read = port.read(read_buf.as_mut_slice()).expect(
             "Found no data when reading from dongle. Please make sure headset is connected.",
         );
-        for i in 0..byte_buf {
-            if let Some(x) = parser.parse(temp[i]) {
+        for i in 0..bytes_read {
+            if let Some(x) = parser.parse(read_buf[i]) {
                 for r in x {
                     match r {
                         PacketType::Attention(value) => {
@@ -44,8 +44,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                         PacketType::Meditation(value) => {
                             println!("Meditation value = {}", value);
                         }
-                        PacketType::AsicEgg(value) => {
-                            println!("EGG power values = {:?}", value);
+                        PacketType::AsicEeg(value) => {
+                            println!("EEG power values = {:?}", value);
                         }
                         _ => (),
                     }

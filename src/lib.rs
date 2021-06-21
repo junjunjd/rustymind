@@ -21,7 +21,7 @@ pub enum PacketType {
     Meditation(u8),
     Blink(u8),
     RawValue(i16),
-    AsicEgg(AsicEgg),
+    AsicEeg(AsicEeg),
     PacketUndefined(u8),
 }
 
@@ -33,7 +33,7 @@ pub enum State {
 }
 
 #[derive(PartialEq, Eq, Debug)]
-pub struct AsicEgg {
+pub struct AsicEeg {
     pub delta: u32,
     pub theta: u32,
     pub low_alpha: u32,
@@ -250,27 +250,27 @@ impl Parser {
                 //ASIC_EEG_POWER: eight big-endian 3-byte unsigned integer values representing
                 //delta, theta, low-alpha high-alpha, low-beta, high-beta, low-gamma, and mid-gamma
                 //EEG band power values
-                let mut current_vec: Vec<u32> = vec![];
+                let mut eeg_vec: Vec<u32> = vec![];
 
                 for i in 0..8 {
                     let asic = ((self.payload[n + 2 + i * 3] as u32) << 16)
                         | ((self.payload[n + 3 + i * 3] as u32) << 8)
                         | (self.payload[n + 4 + i * 3] as u32);
-                    current_vec.push(asic);
+                    eeg_vec.push(asic);
                 }
 
-                let egg_power = AsicEgg {
-                    delta: current_vec[0],
-                    theta: current_vec[1],
-                    low_alpha: current_vec[2],
-                    high_alpha: current_vec[3],
-                    low_beta: current_vec[4],
-                    high_beta: current_vec[5],
-                    low_gamma: current_vec[6],
-                    mid_gamma: current_vec[7],
+                let eeg_power = AsicEeg {
+                    delta: eeg_vec[0],
+                    theta: eeg_vec[1],
+                    low_alpha: eeg_vec[2],
+                    high_alpha: eeg_vec[3],
+                    low_beta: eeg_vec[4],
+                    high_beta: eeg_vec[5],
+                    low_gamma: eeg_vec[6],
+                    mid_gamma: eeg_vec[7],
                 };
-                debug!("Delta {:#04x}, Theta {:#04x}, LowAlpha {:#04x}, HighAlpha {:#04x}, LowBeta {:#04x}, highBeta {:#04x}, LowGamma {:#04x}, MidGamma {:#04x}", egg_power.delta, egg_power.theta, egg_power.low_alpha, egg_power.high_alpha, egg_power.low_beta, egg_power.high_beta, egg_power.low_gamma, egg_power.mid_gamma);
-                result.push(PacketType::AsicEgg(egg_power));
+                debug!("EEG power values = {:?}", eeg_power);
+                result.push(PacketType::AsicEeg(eeg_power));
                 n += 26;
             } else {
                 warn!("packet code undefined {:#04x}", self.payload[n]);
@@ -362,7 +362,7 @@ mod tests {
             }
         }
 
-        let test_asic = AsicEgg {
+        let test_asic = AsicEeg {
             delta: 0x94,
             theta: 0x42,
             low_alpha: 0x0b,
@@ -377,7 +377,7 @@ mod tests {
             result,
             vec![
                 PacketType::PoorSignal(0x00),
-                PacketType::AsicEgg(test_asic),
+                PacketType::AsicEeg(test_asic),
                 PacketType::Attention(0x0d),
                 PacketType::Meditation(0x3d)
             ]

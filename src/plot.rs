@@ -15,7 +15,7 @@ use std::sync::Arc;
 const W: usize = 800;
 const H: usize = 1000;
 const LABEL: [&str; 2] = ["Attention", "Meditation"];
-const EGGLABEL: [&str; 8] = [
+const EEGLABEL: [&str; 8] = [
     "delta",
     "theta",
     "low-alpha",
@@ -80,15 +80,17 @@ fn main() -> Result<(), Box<dyn Error>> {
         });
     let path = matches.value_of("dongle-path").unwrap();
     let mut port = connect_headset(path, &headset[..])?;
-    let mut temp: Vec<u8> = vec![0; 2048];
+    let mut read_buf: Vec<u8> = vec![0; 2048];
     let mut parser = Parser::new();
     let mut esense = vec![VecDeque::new(); 2];
-    let mut egg = vec![VecDeque::new(); 8];
-    let mut buf = BufferWrapper(vec![0u32; W * H]);
+    let mut eeg = vec![VecDeque::new(); 8];
+    let mut draw_buf = BufferWrapper(vec![0u32; W * H]);
     let mut window = Window::new("mindwave plot", W, H, WindowOptions::default())?;
-    let root =
-        BitMapBackend::<BGRXPixel>::with_buffer_and_format(buf.borrow_mut(), (W as u32, H as u32))?
-            .into_drawing_area();
+    let root = BitMapBackend::<BGRXPixel>::with_buffer_and_format(
+        draw_buf.borrow_mut(),
+        (W as u32, H as u32),
+    )?
+    .into_drawing_area();
     root.fill(&BLACK)?;
     let (upper, lower) = root.split_vertically(400);
     let mut chart_up = ChartBuilder::on(&upper)
@@ -122,7 +124,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .label_style(("sans-serif", 15).into_font().color(&GREEN))
         .x_labels(1)
         .y_labels(8)
-        .y_desc("EGG power")
+        .y_desc("EEG power")
         .axis_style(&GREEN)
         .draw()?;
     let cs_up = chart_up.into_chart_state();
@@ -132,11 +134,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     drop(lower);
 
     while window.is_open() && !window.is_key_down(Key::Escape) && running.load(Ordering::SeqCst) {
-        let byte_buf = port.read(temp.as_mut_slice()).expect(
+        let bytes_read = port.read(read_buf.as_mut_slice()).expect(
             "Found no data when reading from dongle. Please make sure headset is connected.",
         );
         let root = BitMapBackend::<BGRXPixel>::with_buffer_and_format(
-            buf.borrow_mut(),
+            draw_buf.borrow_mut(),
             (W as u32, H as u32),
         )?
         .into_drawing_area();
@@ -155,8 +157,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             .bold_line_style(&GREEN.mix(0.2))
             .light_line_style(&TRANSPARENT)
             .draw()?;
-        for i in 0..byte_buf {
-            if let Some(x) = parser.parse(temp[i]) {
+        for i in 0..bytes_read {
+            if let Some(x) = parser.parse(read_buf[i]) {
                 for r in x {
                     match r {
                         PacketType::Attention(value) => {
@@ -165,15 +167,15 @@ fn main() -> Result<(), Box<dyn Error>> {
                         PacketType::Meditation(value) => {
                             esense[1].push_back(value as i32);
                         }
-                        PacketType::AsicEgg(value) => {
-                            egg[0].push_back((value.delta / 10_000) as f64);
-                            egg[1].push_back((value.theta / 10_000) as f64);
-                            egg[2].push_back((value.low_alpha / 10_000) as f64);
-                            egg[3].push_back((value.high_alpha / 10_000) as f64);
-                            egg[4].push_back((value.low_beta / 10_000) as f64);
-                            egg[5].push_back((value.high_beta / 10_000) as f64);
-                            egg[6].push_back((value.low_gamma / 10_000) as f64);
-                            egg[7].push_back((value.mid_gamma / 10_000) as f64);
+                        PacketType::AsicEeg(value) => {
+                            eeg[0].push_back((value.delta / 10_000) as f64);
+                            eeg[1].push_back((value.theta / 10_000) as f64);
+                            eeg[2].push_back((value.low_alpha / 10_000) as f64);
+                            eeg[3].push_back((value.high_alpha / 10_000) as f64);
+                            eeg[4].push_back((value.low_beta / 10_000) as f64);
+                            eeg[5].push_back((value.high_beta / 10_000) as f64);
+                            eeg[6].push_back((value.low_gamma / 10_000) as f64);
+                            eeg[7].push_back((value.mid_gamma / 10_000) as f64);
                         }
                         _ => (),
                     }
@@ -184,9 +186,9 @@ fn main() -> Result<(), Box<dyn Error>> {
             esense[0].pop_front();
             esense[1].pop_front();
         }
-        if egg[0].len() == 100 {
+        if eeg[0].len() == 100 {
             for n in 0..8 {
-                egg[n].pop_front();
+                eeg[n].pop_front();
             }
         }
         for (idx, esense) in (0..).zip(esense.iter()) {
@@ -207,13 +209,13 @@ fn main() -> Result<(), Box<dyn Error>> {
             .background_style(&WHITE.mix(0.5))
             .border_style(&BLACK)
             .draw()?;
-        for (idx, egg) in (0..).zip(egg.iter()) {
+        for (idx, eeg) in (0..).zip(eeg.iter()) {
             chart_low
                 .draw_series(LineSeries::new(
-                    (1..).zip(egg.iter()).map(|(a, b)| (a, *b)),
+                    (1..).zip(eeg.iter()).map(|(a, b)| (a, *b)),
                     &Palette99::pick(idx),
                 ))?
-                .label(EGGLABEL[idx])
+                .label(EEGLABEL[idx])
                 .legend(move |(x, y)| {
                     Rectangle::new([(x - 5, y - 5), (x + 5, y + 5)], &Palette99::pick(idx))
                 });
@@ -231,7 +233,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         drop(upper);
         drop(lower);
         window.set_title("Mindwave real-time plot");
-        window.update_with_buffer(buf.borrow(), W, H)?;
+        window.update_with_buffer(draw_buf.borrow(), W, H)?;
     }
     Ok(())
 }

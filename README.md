@@ -3,7 +3,7 @@
 [![crates.io](https://img.shields.io/crates/v/rustymind.svg?style=flat-square)](https://crates.io/crates/rustymind)
 [![api_doc](https://img.shields.io/badge/doc-api-blue)](https://docs.rs/rustymind)
 
-Rustymind is a driver and parser for NeuroSky MindWave EGG headset written in pure Rust. You can use it to connect, interact, and plot real time data from the headset.
+Rustymind is a driver and parser for NeuroSky MindWave EEG headset written in pure Rust. You can use it to connect, interact, and plot real time data from the headset.
 
 The parser is based on the [mindwave mindset communication protocols](./docs) published by NeuroSky.
 
@@ -27,16 +27,16 @@ If you don't pass in the headset ID argument, the dongle will auto-connect to an
 To use `rustymind` as a library, you need to use `connect_headset` function and `Parser` struct. For example:
 
 ```rust
-use rustymind::{connect_headset, PacketType, Parser, HEADSETID_AUTOCONNECT};
+use rustymind::{connect_headset, PacketType, Parser};
 
 let mut port = connect_headset("/dev/tty.usbserial-10000", b"\xa0\x5f")?;
-let mut temp: Vec<u8> = vec![0; 2048];
+let mut buffer: Vec<u8> = vec![0; 2048];
 let mut parser = Parser::new();
 
 loop {
-    let byte_buf = port.read(temp.as_mut_slice()).unwrap();
-    for i in 0..byte_buf {
-        if let Some(x) = parser.parse(temp[i]) {
+    let bytes_read = port.read(buffer.as_mut_slice()).unwrap();
+    for i in 0..bytes_read {
+        if let Some(x) = parser.parse(buffer[i]) {
             for r in x {
                 match r {
                     PacketType::Attention(value) => {
@@ -45,8 +45,8 @@ loop {
                     PacketType::Meditation(value) => {
                         println!("Meditation value = {}", value);
                     }
-                    PacketType::AsicEgg(value) => {
-                        println!("EGG power values = {:?}", value);
+                    PacketType::AsicEeg(value) => {
+                        println!("EEG power values = {:?}", value);
                     }
                     _ => (),
                 }
