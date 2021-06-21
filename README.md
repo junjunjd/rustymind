@@ -3,4 +3,4 @@ Rustymind is a driver and parser for NeuroSky MindWave EGG headset written in pu
 
 See below for a screenshot of real time mindwave plots provided by `rustymind-plot` CLI.
 
-![Real time plot screenshot](./plot_demo.png)
+![Real time plot screenshot](./docs/plot_demo.png)
