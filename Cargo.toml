@@ -4,7 +4,6 @@ version = "0.1.0"
 authors = ["Junjun Dong <junjun.dong9@gmail.com>"]
 edition = "2018"
 description = "A driver, parser and real time plotter for NeuroSky MindWave EGG headset"
-license = "MIT"
 license-file = "LICENSE.md"
 documentation = "https://docs.rs/rustymind"
 homepage = "https://github.com/junjunjd/rustymind"
