@@ -2,7 +2,7 @@
 
 Rustymind is a driver and parser for NeuroSky MindWave EGG headset written in pure Rust. You can use it to connect, interact, and plot real time data from the headset.
 
-The parser is based on the [mindwave mindset communication protocols](./docs) published by Neurosky.
+The parser is based on the [mindwave mindset communication protocols](./docs) published by NeuroSky.
 
 See below for a screenshot of real time mindwaves plotted by `rustymind-plot` CLI based on `rustymind` parser.
 
@@ -52,3 +52,6 @@ loop {
     }
 }
 ```
+
+This software is not intended to be used in medical diagnostics or medical
+treatment.

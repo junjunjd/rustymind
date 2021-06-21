@@ -1,6 +1,6 @@
 [package]
 name = "rustymind"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Junjun Dong <junjun.dong9@gmail.com>"]
 edition = "2018"
 description = "A driver, parser and real time plotter for NeuroSky MindWave EGG headset"
@@ -8,6 +8,7 @@ license-file = "LICENSE.md"
 documentation = "https://docs.rs/rustymind"
 homepage = "https://github.com/junjunjd/rustymind"
 repository = "https://github.com/junjunjd/rustymind"
+keywords = ["brainwave", "neuroscience", "mindwave", "EGG", "NeuroSky"]
 
 [lib]
 name = "rustymind"
