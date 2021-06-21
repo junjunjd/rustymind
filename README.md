@@ -10,9 +10,9 @@ See below for a screenshot of real time mindwaves plotted by `rustymind-plot` CL
 
 ## Getting Started
 
-'rustymind-plot' takes two arguments to run:
+`rustymind-plot` takes two arguments to run:
 
-- MindWave device path. On Mac, the path would be in the format of '/dev/tty.MindWave'.
+- MindWave device path. On Mac, the path would be in the format of `/dev/tty.MindWave`.
 - Headset ID (printed inside the battery case)
 
 ```sh
