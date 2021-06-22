@@ -1,6 +1,6 @@
 [package]
 name = "rustymind"
-version = "0.1.2"
+version = "0.1.3"
 authors = ["Junjun Dong <junjun.dong9@gmail.com>"]
 edition = "2018"
 description = "A driver, parser and real time plotter for NeuroSky MindWave EEG headset"
