@@ -115,7 +115,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         .label_style(("sans-serif", 15).into_font().color(&GREEN))
         .x_labels(1)
         .y_labels(10)
-        .y_desc("eSense")
         .axis_style(&GREEN)
         .draw()?;
     chart_low
@@ -124,7 +123,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         .label_style(("sans-serif", 15).into_font().color(&GREEN))
         .x_labels(1)
         .y_labels(8)
-        .y_desc("EEG power")
         .axis_style(&GREEN)
         .draw()?;
     let cs_up = chart_up.into_chart_state();
