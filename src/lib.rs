@@ -1,4 +1,5 @@
 use log::{debug, error, info, warn};
+use serde::{Deserialize, Serialize};
 
 pub const HEADSETID_AUTOCONNECT: [u8; 1] = [0xc2];
 
@@ -32,7 +33,7 @@ pub enum State {
     ValidPacket,
 }
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct AsicEeg {
     pub delta: u32,
     pub theta: u32,
