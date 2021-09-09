@@ -18,6 +18,7 @@ use std::error::Error;
 struct Train {
     attention: u8,
     meditation: u8,
+    poor_signal: u8,
     raw_val: Vec<i16>,
     eeg: AsicEeg,
 }
@@ -58,6 +59,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         mid_gamma: 0,
     };
     //let mut wtr = Writer::from_path("train.csv")?;
+    let train_data = Train {
+        attention: 0,
+        meditation: 0,
+        poor_signal: 0,
+        raw_val: Vec::new(),
+        eeg: eeg_power,
+    };
 
     loop {
         let bytes_read = port.read(read_buf.as_mut_slice()).expect(
@@ -68,20 +76,20 @@ fn main() -> Result<(), Box<dyn Error>> {
                 let mut raw: Vec<i32> = Vec::new();
                 for r in x {
                     match r {
+                        PacketType::RawValue(value) => {
+                            println!("Raw value = {}", value);
+                        }
+                        PacketType::PoorSignal(value) => {
+                            println!("Poor signal value = {}", value);
+                        }
+                        PacketType::AsicEeg(value) => {
+                            println!("EEG power values = {:?}", value);
+                        }
                         PacketType::Attention(value) => {
                             println!("Attention value = {}", value);
                         }
                         PacketType::Meditation(value) => {
                             println!("Meditation value = {}", value);
-                        }
-                        PacketType::AsicEeg(value) => {
-                            println!("EEG power values = {:?}", value);
-                        }
-                        PacketType::PoorSignal(value) => {
-                            println!("Poor signal value = {}", value);
-                        }
-                        PacketType::RawValue(value) => {
-                            println!("Raw value = {}", value);
                         }
                         PacketType::PacketUndefined(value) => {
                             println!("undefinded value = {}", value);
