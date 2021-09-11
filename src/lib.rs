@@ -45,6 +45,21 @@ pub struct AsicEeg {
     pub mid_gamma: u32,
 }
 
+impl AsicEeg {
+    pub fn new() -> AsicEeg {
+        AsicEeg {
+            delta: 0,
+            theta: 0,
+            low_alpha: 0,
+            high_alpha: 0,
+            low_beta: 0,
+            high_beta: 0,
+            low_gamma: 0,
+            mid_gamma: 0,
+        }
+    }
+}
+
 pub struct Parser {
     state: State,
     plength: u8,

@@ -23,6 +23,18 @@ struct Train {
     eeg: AsicEeg,
 }
 
+impl Train {
+    fn new() -> Train {
+        Train {
+            attention: 0,
+            meditation: 0,
+            poor_signal: 0,
+            raw_val: Vec::new(),
+            eeg: AsicEeg::new(),
+        }
+    }
+}
+
 #[allow(unreachable_code)]
 fn main() -> Result<(), Box<dyn Error>> {
     env_logger::init();
@@ -48,18 +60,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut port = connect_headset(path, &headset[..])?;
     let mut read_buf: Vec<u8> = vec![0; 2048];
     let mut parser = Parser::new();
-    let eeg_power = AsicEeg {
-        delta: 0,
-        theta: 0,
-        low_alpha: 0,
-        high_alpha: 0,
-        low_beta: 0,
-        high_beta: 0,
-        low_gamma: 0,
-        mid_gamma: 0,
-    };
+    let eeg_power = AsicEeg::new();
     //let mut wtr = Writer::from_path("train.csv")?;
-    let train_data = Train {
+    let mut train_data = Train {
         attention: 0,
         meditation: 0,
         poor_signal: 0,
@@ -78,18 +81,23 @@ fn main() -> Result<(), Box<dyn Error>> {
                     match r {
                         PacketType::RawValue(value) => {
                             println!("Raw value = {}", value);
+                            train_data.raw_val.push(value);
                         }
                         PacketType::PoorSignal(value) => {
                             println!("Poor signal value = {}", value);
+                            train_data.poor_signal = value;
                         }
                         PacketType::AsicEeg(value) => {
                             println!("EEG power values = {:?}", value);
+                            train_data.eeg = value;
                         }
                         PacketType::Attention(value) => {
                             println!("Attention value = {}", value);
+                            train_data.attention = value;
                         }
                         PacketType::Meditation(value) => {
                             println!("Meditation value = {}", value);
+                            train_data.meditation = value;
                         }
                         PacketType::PacketUndefined(value) => {
                             println!("undefinded value = {}", value);
