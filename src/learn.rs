@@ -1,26 +1,19 @@
-//fn main() -> Result<(), Box<dyn Error>> {
-//  let mut wtr = Writer::from_path("foo.csv")?;
-//  wtr.write_record(&[1, 2, 3])?;
-//  wtr.write_record(&["a", "b", "c"])?;
-//  wtr.write_record(&["x", "y", "z"])?;
-//  wtr.flush()?;
-//  Ok(())
-//}
 use clap::{App, Arg};
-use csv::Writer;
 use env_logger;
 use hex::decode;
 use rustymind::{connect_headset, AsicEeg, PacketType, Parser, HEADSETID_AUTOCONNECT};
 use serde::{Deserialize, Serialize};
 use std::error::Error;
+use std::fs::File;
+use std::io::Write;
 
 #[derive(Serialize, Deserialize)]
-struct Train {
-    attention: u8,
-    meditation: u8,
-    poor_signal: u8,
-    raw_val: Vec<i16>,
-    eeg: AsicEeg,
+pub struct Train {
+    pub attention: u8,
+    pub meditation: u8,
+    pub poor_signal: u8,
+    pub raw_val: Vec<i16>,
+    pub eeg: AsicEeg,
 }
 
 impl Train {
@@ -32,6 +25,13 @@ impl Train {
             raw_val: Vec::new(),
             eeg: AsicEeg::new(),
         }
+    }
+
+    fn write<W: Write>(&mut self, mut writer: W) -> serde_json::Result<()> {
+        serde_json::to_writer(&mut writer, &self)?;
+        writer.write_all(&"\n".as_bytes())?;
+        *self = Train::new();
+        Ok(())
     }
 }
 
@@ -61,14 +61,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut read_buf: Vec<u8> = vec![0; 2048];
     let mut parser = Parser::new();
     let eeg_power = AsicEeg::new();
-    //let mut wtr = Writer::from_path("train.csv")?;
-    let mut train_data = Train {
-        attention: 0,
-        meditation: 0,
-        poor_signal: 0,
-        raw_val: Vec::new(),
-        eeg: eeg_power,
-    };
+    let mut buffer = File::create("foo.txt")?;
+    let mut train_data = Train::new();
 
     loop {
         let bytes_read = port.read(read_buf.as_mut_slice()).expect(
@@ -98,6 +92,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                         PacketType::Meditation(value) => {
                             println!("Meditation value = {}", value);
                             train_data.meditation = value;
+                            train_data.write(buffer)?;
                         }
                         PacketType::PacketUndefined(value) => {
                             println!("undefinded value = {}", value);
