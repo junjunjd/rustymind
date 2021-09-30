@@ -61,7 +61,7 @@ fn main() -> Result<()> {
     let mut port = connect_headset(path, &headset[..]).map_err(|s| anyhow!(s))?;
     let mut read_buf: Vec<u8> = vec![0; 2048];
     let mut parser = Parser::new();
-    let mut buffer = File::create("train_data.txt")?;
+    let mut buffer = File::create("train_data.json")?;
     let mut train_data = Train::new();
 
     loop {
