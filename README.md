@@ -3,7 +3,7 @@
 [![crates.io](https://img.shields.io/crates/v/rustymind.svg?style=flat-square)](https://crates.io/crates/rustymind)
 [![api_doc](https://img.shields.io/badge/doc-api-blue)](https://docs.rs/rustymind)
 
-Rustymind is a driver and parser for NeuroSky MindWave EEG headset written in pure Rust. You can use it to connect, interact, and plot real time data from the headset.
+Rustymind is a driver and parser for NeuroSky MindWave EEG headset written in pure Rust. You can use it to connect, interact, and plot real time brainwave data measured from the headset.
 
 The parser is based on the [mindwave mindset communication protocols](./docs) published by NeuroSky.
 
